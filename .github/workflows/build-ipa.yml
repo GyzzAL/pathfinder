@@ -9,18 +9,15 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: '20.19.0'
+          cache: 'npm'
       - run: npm install --legacy-peer-deps
-      
-      - name: Fix bundle
+
+      - name: Prebuild iOS
         run: |
           npx expo prebuild --platform ios --clean --no-install
-          cd ios && pod install
-          cd ..
-          # Testa se o bundle do JS funciona antes do Xcode
-          npx react-native bundle --platform ios --dev false --entry-file index.js --bundle-output ios/main.jsbundle --assets-dest ios || npx react-native bundle --platform ios --dev false --entry-file App.js --bundle-output ios/main.jsbundle --assets-dest ios || echo "Tentando com App.tsx"
-          ls -lh ios/main.jsbundle || true
+          cd ios && pod install && cd ..
 
-      - name: Build IPA
+      - name: Build Archive
         run: |
           cd ios
           xcodebuild -workspace PathFinder.xcworkspace \
@@ -31,11 +28,19 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            archive -quiet
+            SKIP_INSTALL=NO \
+            archive
+
+      - name: Make IPA
+        run: |
+          cd ios
           mkdir -p build/Payload
-          APP=$(find build/App.xcarchive -name "*.app" -type d | head -n 1)
+          APP=$(find build/App.xcarchive -name "*.app" | head -n 1)
+          echo "APP: $APP"
           cp -R "$APP" build/Payload/
-          cd build && zip -qr App.ipa Payload
+          cd build && zip -r App.ipa Payload -q
+          ls -lh App.ipa
+
       - uses: actions/upload-artifact@v5
         with:
           name: IPA
