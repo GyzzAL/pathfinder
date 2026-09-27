@@ -1,33 +1,37 @@
-name: Build Web
+name: Build IPA
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
           node-version: '20.19.0'
       - run: npm install --legacy-peer-deps
-      - run: npx expo export --platform web
-      - uses: actions/upload-pages-artifact@v3
+
+      - name: Gerar projeto iOS
+        run: |
+          npx expo prebuild --platform ios --clean --no-install
+          cd ios && pod install && cd ..
+
+      - name: Build IPA
+        run: |
+          cd ios
+          xcodebuild -workspace PathFinder.xcworkspace \
+            -scheme PathFinder \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/App.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            archive
+          mkdir -p build/Payload
+          APP=$(find build/App.xcarchive -name "*.app" | head -n 1)
+          cp -R "$APP" build/Payload/
+          cd build && zip -qr App.ipa Payload
+
+      - uses: actions/upload-artifact@v5
         with:
-          path: dist
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          name: IPA
+          path: ios/build/App.ipa
