@@ -2,7 +2,7 @@ name: Build iOS IPA
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
@@ -10,31 +10,31 @@ jobs:
     runs-on: macos-latest
 
     steps:
-    - name: Checkout do código
-      uses: actions/upload-artifact@v4
+      - name: Checkout do código
+        uses: actions/checkout@v4
 
-    - name: Selecionar versão do Xcode
-      run: sudo xcode-select -s /Applications/Xcode.app
+      - name: Selecionar versão do Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
 
-    - name: Compilar o Archive
-      run: |
-        xcodebuild archive \
-          -workspace SeuProjeto.xcworkspace \  # Ou -project SeuProjeto.xcodeproj
-          -scheme SeuScheme \
-          -archivePath build/SeuProjeto.xcarchive \
-          -sdk iphoneos \
-          CODE_SIGNING_ALLOWED=NO \
-          CODE_SIGNING_REQUIRED=NO
+      - name: Compilar e Criar Archive
+        run: |
+          xcodebuild archive \
+            -project *.xcodeproj \
+            -scheme $(xcodebuild -list -json | grep -A 1 '"schemes"' | tail -n 1 | tr -d ' "') \
+            -archivePath build/App.xcarchive \
+            -sdk iphoneos \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
 
-    - name: Gerar o ficheiro .IPA
-      run: |
-        mkdir -p build/Payload
-        cp -r build/SeuProjeto.xcarchive/Products/Applications/*.app build/Payload/
-        cd build
-        zip -r SeuProjeto.ipa Payload
+      - name: Empacotar Payload (.IPA)
+        run: |
+          mkdir -p build/Payload
+          cp -r build/App.xcarchive/Products/Applications/*.app build/Payload/
+          cd build
+          zip -r App.ipa Payload
 
-    - name: Upload do IPA como Artefacto
-      uses: actions/upload-artifact@v3
-      with:
-        name: app-release
-        path: build/SeuProjeto.ipa
+      - name: Upload do IPA como Artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-ipa
+          path: build/App.ipa
