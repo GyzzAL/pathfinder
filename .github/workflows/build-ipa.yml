@@ -1,17 +1,40 @@
-- name: Checkout repository
-      uses: actions/checkout@v4
+name: Build iOS IPA
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: 20
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
 
-    # 1. Força a instalação completa das novas dependências do package.json
-    - name: Install Node Dependencies
-      run: npm install
+jobs:
+  build:
+    runs-on: macos-latest
 
-    # 2. Garante que os Pods nativos (como react-native-svg e expo-file-system) sejam vinculados
-    - name: Install CocoaPods
+    steps:
+    - name: Checkout do código
+      uses: actions/checkout@v3
+
+    - name: Selecionar versão do Xcode
+      run: sudo xcode-select -s /Applications/Xcode.app
+
+    - name: Compilar o Archive
       run: |
-        cd ios
-        pod install --repo-update
+        xcodebuild archive \
+          -workspace SeuProjeto.xcworkspace \  # Ou -project SeuProjeto.xcodeproj
+          -scheme SeuScheme \
+          -archivePath build/SeuProjeto.xcarchive \
+          -sdk iphoneos \
+          CODE_SIGNING_ALLOWED=NO \
+          CODE_SIGNING_REQUIRED=NO
+
+    - name: Gerar o ficheiro .IPA
+      run: |
+        mkdir -p build/Payload
+        cp -r build/SeuProjeto.xcarchive/Products/Applications/*.app build/Payload/
+        cd build
+        zip -r SeuProjeto.ipa Payload
+
+    - name: Upload do IPA como Artefacto
+      uses: actions/upload-artifact@v3
+      with:
+        name: app-release
+        path: build/SeuProjeto.ipa
