@@ -1,46 +1,17 @@
-name: Build IPA
-on:
-  workflow_dispatch:
-jobs:
-  build:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: '20.19.0'
-      - run: npm install --legacy-peer-deps
+- name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Prebuild iOS
-        run: |
-          npx expo prebuild --platform ios --clean --no-install
-          cd ios && pod install && cd ..
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
 
-      - name: Build Archive
-        run: |
-          cd ios
-          xcodebuild -workspace PathFinder.xcworkspace \
-            -scheme PathFinder \
-            -configuration Release \
-            -destination 'generic/platform=iOS' \
-            -archivePath build/App.xcarchive \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            SKIP_INSTALL=NO \
-            archive
+    # 1. Força a instalação completa das novas dependências do package.json
+    - name: Install Node Dependencies
+      run: npm install
 
-      - name: Make IPA
-        run: |
-          cd ios
-          mkdir -p build/Payload
-          APP=$(find build/App.xcarchive -name "*.app" | head -n 1)
-          echo "APP: $APP"
-          cp -R "$APP" build/Payload/
-          cd build && zip -r App.ipa Payload -q
-          ls -lh App.ipa
-
-      - uses: actions/upload-artifact@v5
-        with:
-          name: IPA
-          path: ios/build/App.ipa
+    # 2. Garante que os Pods nativos (como react-native-svg e expo-file-system) sejam vinculados
+    - name: Install CocoaPods
+      run: |
+        cd ios
+        pod install --repo-update
